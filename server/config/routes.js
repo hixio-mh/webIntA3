@@ -26,17 +26,17 @@ module.exports.routes = {
     view: 'assets/index.html'
   },
   //ITEM CONTROLLER
-  'get /wordOne': {
+  'get /wordOne/:search': {
     controller: 'ItemsController',
     action: 'wordOne'
   },
 
-  'get /wordMore': {
+  'get /wordMore/:search': {
     controller: 'ItemsController',
     action: 'wordMore'
   },
 
-  'get /pageRank': {
+  'get /pageRank/:search': {
     controller: 'ItemsController',
     action: 'pageRank'
   },

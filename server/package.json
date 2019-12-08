@@ -15,6 +15,7 @@
     "flatted": "^2.0.1",
     "grunt": "1.0.1",
     "json-stringify-safe": "^5.0.1",
+    "n-readlines": "^1.0.0",
     "nodemon": "^2.0.1",
     "sails": "^1.1.0",
     "sails-hook-grunt": "^3.1.0",
