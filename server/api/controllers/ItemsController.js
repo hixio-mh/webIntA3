@@ -59,6 +59,9 @@ module.exports = {
     });
 
     let top5Results = currentSearchFiles.slice(0,5);
+    top5Results.forEach(file => {
+      file.fileName = decodeURIComponent(file.fileName)
+    });
 
     return res.status(200).json(top5Results);
   },
@@ -110,16 +113,20 @@ module.exports = {
     });
 
     let top5Results = filesHavingAtLeastOneWord.splice(0,5);
+    top5Results.forEach(file => {
+      file.fileName = decodeURIComponent(file.fileName)
+    });
 
     return res.status(200).json(top5Results);
   },
 
   pageRank: async function(req, res) {
     let search = req.param('search');
+
     let searchWords = search.split(' ');
 
     let allFileObjects = await getFileObjects();
-    
+
     calculatePageRank(allFileObjects);
     normalizePageRank(allFileObjects);
 
@@ -166,7 +173,9 @@ module.exports = {
     });
 
     let top5Results = filesHavingAtLeastOneWord.splice(0,5);
-
+    top5Results.forEach(file => {
+      file.fileName = decodeURIComponent(file.fileName)
+    });
     return res.status(200).json(top5Results);
   }
 };
@@ -237,14 +246,14 @@ function normalizeWordFreqScore(files) {
 
 async function getFileObjects() {
   let gameFiles = fs.readdirSync(__dirname + pathWordGames);
-  let files = await Promise.all(gameFiles.map(async (file, index) => {
+  let files = await Promise.all(gameFiles.map(async (file) => {
     let words = await readFileToWordCountObject(__dirname + pathWordGames + '/' + file, file);
     let links = await readFileToGetLinkSet(__dirname + pathLinkGames + '/' + file, file);
     let fileObject = new FileObject(file, words, links);
     return fileObject;
   }));
   let programmingFiles = fs.readdirSync(__dirname + pathWordProgramming);
-  let files2 = await Promise.all(programmingFiles.map(async (file, index) => {
+  let files2 = await Promise.all(programmingFiles.map(async (file) => {
     let words = await readFileToWordCountObject(__dirname + pathWordProgramming + '/' + file, file);
     let links = await readFileToGetLinkSet(__dirname + pathLinkProgramming + '/' + file);
     let fileObject = new FileObject(file, words, links);
@@ -274,7 +283,6 @@ async function readFileToGetLinkSet(path) {
     let string = ''+line;
     linkSet.add(string);
   }
-  // console.log(linkSet);
   return linkSet;
 }
 

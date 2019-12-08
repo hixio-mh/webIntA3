@@ -20,7 +20,7 @@ export default class UserSimIndexTable extends Component {
             style={{ 
             height: `${this.props.data.length !== 0 ? this.props.data.length * 31 + 40 : 0}px`, 
             width: '600px' }} 
-        >
+        >   
             {this.props.data.length !== 0 ? 'Score Table:' : <span></span>}
             <AgGridReact
             columnDefs={[{
