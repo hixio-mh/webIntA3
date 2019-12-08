@@ -4,16 +4,22 @@
  * @description :: Server-side actions for handling incoming requests.
  * @help        :: See https://sailsjs.com/docs/concepts/actions
  */
-const csv = require('csvtojson');
 const fs = require('fs');
 const lineByLine = require('n-readlines');
 
-const pathGames = './../../wikipedia/words/Games';
-const pathProgramming = './../../wikipedia/words/programming';
+const pathWordGames = './../../wikipedia/words/Games';
+const pathWordProgramming = './../../wikipedia/words/programming';
+const pathLinkGames = './../../wikipedia/links/Games';
+const pathLinkProgramming = './../../wikipedia/links/programming';
 const FileObject = (function() {
-  return function FileObject(fileName, words) {
+  return function FileObject(fileName, words, links) {
     this.fileName = fileName;
     this.words = words;
+    this.links = links;
+    this.location = 0;
+    this.content = 0;
+    this.pagerank = 0;
+    this.score = 0;
   };
 })();
 
@@ -24,8 +30,8 @@ module.exports = {
 
   wordOne: async function(req, res) {
     let search = req.param('search');
-    let array = search.split(' ');  // only allow one word
-    search = array[0];
+    let array = search.split(' ');
+    search = array[0]; // only allow one word
 
     let allFileObjects = await getFileObjects();
 
@@ -35,64 +41,186 @@ module.exports = {
       return filesToGet.includes(file.fileName);
     });
 
-    let results = [];
-
     currentSearchFiles.forEach(file =>{
-      results.push({page: file.fileName, content: getWordFrequency(file, search), location: 0, pagerank: 0});
+      file.content = getWordFrequency(file, search);
     });
 
-    normalizeWordFreqScore(results);
+    normalizeWordFreqScore(currentSearchFiles);
 
-    setResultsScore(results);
-
-    results.sort((a, b) => {
-      return (a.page < b.page) ? 1 : -1;
+    currentSearchFiles.forEach(file =>{ // setting the scores for 'one word' search.
+      file.score = file.content;
     });
-    results.sort((a, b) => {
+
+    currentSearchFiles.sort((a, b) => {
+      return (a.fileName < b.fileName) ? 1 : -1;
+    });
+    currentSearchFiles.sort((a, b) => {
       return (a.score < b.score) ? 1 : -1;
     });
 
-    results = results.slice(0,5);
+    let top5Results = currentSearchFiles.slice(0,5);
 
-    return res.status(200).json(results);
+    return res.status(200).json(top5Results);
   },
 
   wordMore: async function(req, res) {
     let search = req.param('search');
-    console.log('word more');
-    search+='wm';
-    return res.status(200).json(search);
+    let searchWords = search.split(' ');
+
+    let allFileObjects = await getFileObjects();
+
+    let filesHavingAtLeastOneWord = [];
+
+    searchWords.forEach(word => {  // create an array of the files that contain any of the words from the search.
+      let filesToGet = fileWordMap.get(word);
+      let currentSearchFiles = allFileObjects.filter(file => {
+        return filesToGet.includes(file.fileName);
+      });
+
+      filesToPush = currentSearchFiles.filter(file => {
+        return !filesHavingAtLeastOneWord.includes(file);
+      });
+
+      if (filesToPush.length > 0) {
+        filesHavingAtLeastOneWord = [...filesHavingAtLeastOneWord, ...filesToPush];
+      }
+    });
+
+    searchWords.forEach(word => {  // add the location scores to the fileObjects
+      filesHavingAtLeastOneWord.forEach(file => {
+        file.content = getWordFrequency(file, search); //lets add the word-frequency somewhere when we either way go through the files
+        if (file.words[word]) { // word exists?
+          file.location += file.words[word].firstIndex + 1;
+        } else { // word did not exist, then add a high value (create 'location' on object or add to it).
+          file.location += 100000;
+        }
+      });
+    });
+
+    normalizeWordFreqScore(filesHavingAtLeastOneWord);
+
+    normalizeLocationMetric(filesHavingAtLeastOneWord);
+
+    filesHavingAtLeastOneWord.forEach(file =>{ // add values to the object so that we can print it on frontend.
+      file.score = Math.round((file.location + file.content) * 100) / 100; // round and set the score for 'more than one word search'
+    });
+
+    filesHavingAtLeastOneWord.sort((a, b) => {
+      return (a.score < b.score) ? 1 : -1;
+    });
+
+    let top5Results = filesHavingAtLeastOneWord.splice(0,5);
+
+    return res.status(200).json(top5Results);
   },
 
   pageRank: async function(req, res) {
     let search = req.param('search');
-    console.log('page rank');
-    search+='pr';
-    return res.status(200).json(search);
+    let searchWords = search.split(' ');
+
+    let allFileObjects = await getFileObjects();
+    
+    calculatePageRank(allFileObjects);
+    normalizePageRank(allFileObjects);
+
+    let filesHavingAtLeastOneWord = [];
+
+    searchWords.forEach(word => {  // create an array of the files that contain any of the words from the search.
+      let filesToGet = fileWordMap.get(word);
+      let currentSearchFiles = allFileObjects.filter(file => {
+        return filesToGet.includes(file.fileName);
+      });
+
+      filesToPush = currentSearchFiles.filter(file => {
+        return !filesHavingAtLeastOneWord.includes(file);
+      });
+
+      if (filesToPush.length > 0) {
+        filesHavingAtLeastOneWord = [...filesHavingAtLeastOneWord, ...filesToPush];
+      }
+    });
+
+    searchWords.forEach(word => {  // add the location scores to the fileObjects
+      filesHavingAtLeastOneWord.forEach(file => {
+        file.content = getWordFrequency(file, search); //lets add the word-frequency somewhere when we either way go through the files
+        if (file.words[word]) { // word exists?
+          file.location += file.words[word].firstIndex + 1;
+        } else { // word did not exist, then add a high value (create 'location' on object or add to it).
+          file.location += 100000;
+        }
+      });
+    });
+
+    normalizeWordFreqScore(filesHavingAtLeastOneWord);
+
+    normalizeLocationMetric(filesHavingAtLeastOneWord);
+
+    
+
+    filesHavingAtLeastOneWord.forEach(file =>{ // add values to the object so that we can print it on frontend.
+      file.score = Math.round((file.location + file.content + file.pagerank) * 100) / 100; // round and set the score for 'more than one word search'
+    });
+
+    filesHavingAtLeastOneWord.sort((a, b) => {
+      return (a.score < b.score) ? 1 : -1;
+    });
+
+    let top5Results = filesHavingAtLeastOneWord.splice(0,5);
+
+    return res.status(200).json(top5Results);
   }
 };
 
-function setResultsScore(results) {
-  results.forEach(result =>{
-    result.score = result.content + result.location + result.pagerank;
+function calculatePageRank(pages) {
+  pages.forEach(page => {
+    page.pagerank = 1;
+  });
+  for (i = 0; i < 20; i++) {
+    let ranks = [];
+    for(i2 = 0; i2 < pages.length; i2++) {
+      ranks.push(iteratePR(pages[i2], pages));
+    }
+    for (i3 = 0; i3 < pages.length; i3++) {
+      pages[i3].pagerank = ranks[i3];
+    }
+  }
+}
+
+function iteratePR(page, pages) {
+  let pr = 0;
+  pages.forEach(page2 => {
+    if (page2.links.has('/wiki/' + page.fileName)) {
+      pr+= (page2.pagerank / page2.links.size);
+    }
+  });
+  return 0.85 * pr + 0.15;
+}
+
+
+function normalizeLocationMetric(files) {
+  let minValue = Number.MAX_VALUE;
+
+  files.forEach(file => {
+    if (file.location < minValue) {
+      minValue = file.location;
+    }
+  });
+
+  files.forEach(file => {
+    file.location = Math.round(0.8 * (minValue/file.location * 100)) / 100; //doing the 0.8 multiplication to get rounded sorted here already.
   });
 }
 
-async function getFileObjects() {
-  let gameFiles = fs.readdirSync(__dirname + pathGames);
-  let programmingFiles = fs.readdirSync(__dirname + pathProgramming);
-  let files = await Promise.all(gameFiles.map(async (file, index) => {
-    let words = await readFileToWordCountObject(__dirname + pathGames + '/' + file, file);
-    let fileObject = new FileObject(file, words);
-    return fileObject;
-  }));
-  let files2 = await Promise.all(programmingFiles.map(async (file, index) => {
-    let words = await readFileToWordCountObject(__dirname + pathProgramming + '/' + file, file);
-    let fileObject = new FileObject(file, words);
-    return fileObject;
-  }));
-
-  return [...files, ...files2];
+function normalizePageRank(files) {
+  let maxScore = 0;
+  files.forEach(file => {
+    if (file.pagerank > maxScore) {
+      maxScore = file.pagerank;
+    }
+  });
+  files.forEach(file => {
+    file.pagerank = Math.round(0.5 * (file.pagerank/maxScore * 100)) / 100;
+  });
 }
 
 function normalizeWordFreqScore(files) {
@@ -107,14 +235,49 @@ function normalizeWordFreqScore(files) {
   });
 }
 
+async function getFileObjects() {
+  let gameFiles = fs.readdirSync(__dirname + pathWordGames);
+  let files = await Promise.all(gameFiles.map(async (file, index) => {
+    let words = await readFileToWordCountObject(__dirname + pathWordGames + '/' + file, file);
+    let links = await readFileToGetLinkSet(__dirname + pathLinkGames + '/' + file, file);
+    let fileObject = new FileObject(file, words, links);
+    return fileObject;
+  }));
+  let programmingFiles = fs.readdirSync(__dirname + pathWordProgramming);
+  let files2 = await Promise.all(programmingFiles.map(async (file, index) => {
+    let words = await readFileToWordCountObject(__dirname + pathWordProgramming + '/' + file, file);
+    let links = await readFileToGetLinkSet(__dirname + pathLinkProgramming + '/' + file);
+    let fileObject = new FileObject(file, words, links);
+    return fileObject;
+  }));
+
+  return [...files, ...files2];
+}
+
+
 function getWordFrequency(fileObject, searchString) {
   let searchWords = searchString.split(' ');
   let score = 0;
   searchWords.forEach(word => {
-    score += fileObject.words[word].count;
+    if (fileObject.words[word]) {
+      score += fileObject.words[word].count;
+    }
   });
   return score;
 }
+
+async function readFileToGetLinkSet(path) {
+  let linkSet = new Set();
+  var liner = new lineByLine(path);
+  // read the file, line by line so that the whole file is not stored in memory.
+  while(line = liner.next()){
+    let string = ''+line;
+    linkSet.add(string);
+  }
+  // console.log(linkSet);
+  return linkSet;
+}
+
 
 async function readFileToWordCountObject(path, file) {
   var words='';

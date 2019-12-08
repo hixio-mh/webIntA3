@@ -21,11 +21,10 @@ export default class UserSimIndexTable extends Component {
             height: `${this.props.data.length !== 0 ? this.props.data.length * 31 + 40 : 0}px`, 
             width: '600px' }} 
         >
-            {console.log(this.props.data.length)}
             {this.props.data.length !== 0 ? 'Score Table:' : <span></span>}
             <AgGridReact
             columnDefs={[{
-                    headerName: "Page", field: "page", width: 200
+                    headerName: "Page", field: "fileName", width: 200
                 }, {
                     headerName: "Score", field: "score", width: 100
                 }, {
