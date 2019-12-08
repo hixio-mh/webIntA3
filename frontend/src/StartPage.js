@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { Button, Row, Col, Container, Form, Spinner } from 'react-bootstrap';
-
+import ScoreTable from './ScoreTable'
 
 
 
@@ -10,24 +10,15 @@ export default class StartPage extends Component {
 		this.state = {
 			isLoading: null,
 			searchWord: '',
-			typeChoice: 'wordOne'
+			typeChoice: 'wordOne',
+			data: null,
 		};
 	}
-
-	async componentDidMount() {
-
-  
-	}
-
-	
 
 	handleTypeChange = async (event) => {
 		const choice = event.target.value
 		this.setState({typeChoice: choice})
 	}
-	
-  
-     
 
     requestData = async () => {
 		const search = this.state.searchWord;
@@ -45,11 +36,8 @@ export default class StartPage extends Component {
 		const data = await response.json();
 
 		if (data) {
-			this.setState({isLoading: false})
-			console.log(data)
+			this.setState({isLoading: false, data: data})
 		}
-
-
 	}
 
 	handleSearch = (event) => {
@@ -57,8 +45,16 @@ export default class StartPage extends Component {
 		this.setState({searchWord: word})
 	}
 
+	renderTable = () => {
+        return (
+			<>
+			<Row style={{ marginTop: 30, marginBottom: 10 }}></Row>
+            <ScoreTable data={this.state.data}> </ScoreTable>
+			</>
+        )
+	}
 
-
+	
 	renderAll = () => {
 		return (
 			<>
@@ -93,6 +89,7 @@ export default class StartPage extends Component {
 				</Form>
 				<Button onClick={this.requestData}>Send Request to Server</Button></>}
                 <Row style={{ marginTop: 10, marginBottom: 10 }}></Row>
+				{this.state.data ? this.renderTable() : <Row></Row>}
 			</>
 		)
 	}

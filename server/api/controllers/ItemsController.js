@@ -38,19 +38,21 @@ module.exports = {
     let results = [];
 
     currentSearchFiles.forEach(file =>{
-      results.push({page: file, score: getWordFrequency(file, search)});
+      results.push({page: file.fileName, content: getWordFrequency(file, search), location: 0, pagerank: 0});
     });
 
+    normalizeWordFreqScore(results);
+
+    setResultsScore(results);
+
     results.sort((a, b) => {
-      return (a.fileName < b.fileName) ? 1 : -1;
+      return (a.page < b.page) ? 1 : -1;
     });
     results.sort((a, b) => {
       return (a.score < b.score) ? 1 : -1;
     });
 
     results = results.slice(0,5);
-
-    normalizeSortedWordFreqScore(results);
 
     return res.status(200).json(results);
   },
@@ -70,6 +72,12 @@ module.exports = {
   }
 };
 
+function setResultsScore(results) {
+  results.forEach(result =>{
+    result.score = result.content + result.location + result.pagerank;
+  });
+}
+
 async function getFileObjects() {
   let gameFiles = fs.readdirSync(__dirname + pathGames);
   let programmingFiles = fs.readdirSync(__dirname + pathProgramming);
@@ -87,10 +95,15 @@ async function getFileObjects() {
   return [...files, ...files2];
 }
 
-function normalizeSortedWordFreqScore(files) {
-  let maxScore = files[0].score;
+function normalizeWordFreqScore(files) {
+  let maxScore = 0;
   files.forEach(file => {
-    file.score = Math.round(file.score/maxScore * 100) / 100;
+    if (file.content > maxScore) {
+      maxScore = file.content;
+    }
+  });
+  files.forEach(file => {
+    file.content = Math.round(file.content/maxScore * 100) / 100;
   });
 }
 
